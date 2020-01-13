@@ -270,6 +270,7 @@ bfftfilt = bfft[ylim1:ylim2,xlim1:xlim2]
 divfftfilt = divfft[ylim1:ylim2,xlim1:xlim2]  
 
 mfilt = np.fft.ifft(mfftfilt)
+bfilt = np.fft.ifft(bfftfilt)
 divfilt = np.fft.ifft(divfftfilt)
 xfilt=np.linspace(0,divfilt.shape[1],divfilt.shape[1])
 yfilt=np.linspace(0,divfilt.shape[0],divfilt.shape[0])
@@ -278,9 +279,9 @@ xgfilt, ygfilt = np.meshgrid(xfilt, yfilt)
 
 
 
-filtplt, (filtaxRe,filtaxIm) = plt.subplots(1,2, sharey=True)
+filtplt, (filtaxM,filtaxB, filtaxD) = plt.subplots(1,3, sharex=True, sharey=True)
 
-CSre = filtaxRe.contourf(xfilt,yfilt,divfilt.real,500,cmap='jet',vmin=-10,vmax=40)
+CSre = filtaxM.contourf(xfilt,yfilt,np.abs(mfilt),500,cmap='jet',vmin=-10,vmax=10)
 #filtaxRe.set_xlim(16,45)
 
 CSim = filtaxIm.contourf(xfilt,yfilt,divfilt.imag,500,cmap='jet',vmin=5,vmax=10)
