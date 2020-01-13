@@ -260,13 +260,15 @@ window = signal.general_gaussian(bfft[1].size, p=2, sig=100)
 plt.plot(window)
 
 #%%   FFT Filtering
-xlim1 = 0
-xlim2 = 3000
+xlim1 = 2980
+xlim2 = 3100
+ylim1 = 380
+ylim2 = 620
+
 mfftfilt = mfft[ylim1:ylim2,xlim1:xlim2]
 bfftfilt = bfft[ylim1:ylim2,xlim1:xlim2]
-divfftfilt = divfft[ylim1:ylim2,xlim1:xlim2]  ###magic numbers for 840
-#divfftfiltRe = divfftfilt.real
-#Wfilt = W[1200:1650]
+divfftfilt = divfft[ylim1:ylim2,xlim1:xlim2]  
+
 mfilt = np.fft.ifft(mfftfilt)
 divfilt = np.fft.ifft(divfftfilt)
 xfilt=np.linspace(0,divfilt.shape[1],divfilt.shape[1])
