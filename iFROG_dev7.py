@@ -136,6 +136,10 @@ ax3.set_ylim(600,800)
 timestep=0.66713  ##this is the time for one 100nm step.  This returns the FFT
                     # x-axis in THz
 
+
+###   Try np.fft.rfft and np.fft.hfft
+###   Check to make sure the resulting plots are symmetric in the frequency domain
+
 bfft = np.fft.fft(databbo)
 Wb = np.fft.fftfreq(posb.size,timestep)
 
@@ -146,7 +150,7 @@ xgbfft, ygbfft =np.meshgrid(xfft,yfft)
 mfft = np.fft.fft(datamos2)
 Wm = np.fft.fftfreq(posm.size,timestep)         
 
-xfft=Wb
+xfft=Wm
 yfft=np.linspace(1,mfft.shape[0],num=mfft.shape[0])
 xgmfft, ygmfft =np.meshgrid(xfft,yfft)
 
@@ -187,6 +191,7 @@ xgdfft, ygdfft =np.meshgrid(xfft,yfft)
 
 #%% Plot FFT NEW
 g, ((gx1,gx2),(gx3,gx4),(gx5,gx6)) = plt.subplots(3,2, sharex=True, sharey=True)
+
 # =============================================================================
 # xlim1 = .32  ### Sets x min
 # xlim2 = .38  ### and max in THz
@@ -197,9 +202,11 @@ xlim2 = W.max()
 ylim1=400        ###Sets ymin
 ylim2 = 600      ###and max in pixel number ---- need to convert to wavelength
 
-divfft = np.absolute(divfft)
-mfft = np.absolute(mfft)
-bfft = np.absolute(bfft)
+# =============================================================================
+# divfft = np.absolute(divfft)
+# mfft = np.absolute(mfft)
+# bfft = np.absolute(bfft)
+# =============================================================================
 
 
 RealFFT = gx1.contourf(xgdfft,ygdfft,(divfft.real),100,cmap='jet')
@@ -245,7 +252,7 @@ gx6.set_ylim(ylim1,ylim2)
 
 #%% Window FFT Filter
 from scipy import signal
-window = window = signal.general_gaussian(3040, p=1.5, sig=7)
+window = signal.general_gaussian(bfft[1].size, p=2, sig=100)
 plt.plot(window)
 
 #%%   FFT Filtering
