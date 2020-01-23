@@ -348,7 +348,7 @@ def SelectBands(neg_band, pos_band, fft_array, bandwidth=200):
     window_neg = np.append(window[neg_band:window.size], np.zeros(neg_band))
     window_pos = np.append(np.zeros(window.size-pos_band), window[0:pos_band])
     window = window_neg + window_pos
-    return window 
+    return window, window_neg, window_pos
     
 #%%thing
     fm_neg = bfft.real[:,fm_neg-300:fm_neg+300]
