@@ -11,7 +11,7 @@ Created on Tue Aug 20 18:11:57 2019
 import numpy as np
 import matplotlib.colors as colors
 import matplotlib.pyplot as plt
-import scipy.interpolate as interp
+import scipy.interpolate as interpolate
 from scipy import signal
 from matplotlib import ticker, cm
 from skimage.feature import peak_local_max
@@ -297,21 +297,74 @@ CSB = filtaxB.contourf(xfilt,yfilt,np.abs(bfilt),500,cmap='jet')#,vmin=-10,vmax=
 #filtaxIm.set_xlim(16,45)
 
 #CSD = filtaxD.contourf(xfilt,yfilt,np.abs(divfilt),500,cmap='jet')#,vmin=-10,vmax=10)
-
-#%% Find local maxima in FFT arrays
-def FindBandIndices(fft_array):
+#%% Find t0
+def FindTZero(data_array):
     """
-    
+    Finds t0 in the raw iFROG trace.
 
     Parameters
     ----------
-    fft_array : 2d float array
-        2d FFT array to be windowed.
+    data_array : ndarray
+        2d numpy array containing raw iFROG data.
 
     Returns
     -------
-    band_indices : 1d float array
-        The indices of the maxima of the FFT array to be windowed.
+    t0 : int
+        The index value of the absolute maximum of the input array.
+
+    """
+    t0 = peak_local_max(data_array, num_peaks=1)
+    return t0
+#%% get FROG traces
+def FrogMath(fft_array, bandwidth=200):
+    band_indices = FindBandIndices(fft_array.real)
+    dc = fft_array[400:600,band_indices[0]-bandwidth:band_indices[0]+bandwidth]
+    fm = fft_array[400:600,band_indices[1]-bandwidth:band_indices[1]+bandwidth]
+    shg = fft_array[400:600,band_indices[2]-bandwidth:band_indices[2]+bandwidth]
+    window = signal.windows.general_gaussian(dc[1].size, p=2, sig=bandwidth)
+    dc = dc * window
+    fm = fm * window
+    shg = shg * window
+    dc_ifft = np.fft.ifft(dc)
+    fm_ifft = np.fft.ifft(fm)
+    shg_ifft = np.fft.ifft(shg)
+    dc = np.abs(dc)
+    dc_ifft = np.abs(dc_ifft)
+    fm = np.abs(fm)
+    fm_ifft = np.abs(fm_ifft)
+    shg = np.abs(shg)
+    shg_ifft = np.abs(shg_ifft)
+    
+    return dc, dc_ifft, fm, fm_ifft, shg, shg_ifft
+#%%
+
+#%% Find local maxima in FFT arrays
+def FindBandIndices(fft_array):
+    """F
+    Finds the 5 expected band maxima in a fourier-transformed iFROG trace
+    and returns the corresponding indices. Requires real values.
+
+    Parameters
+    ----------
+    fft_array : 2d complex array
+        iFROG data after FFT has been performed.
+
+    Returns
+    -------
+    shg_neg : int
+        The index value of the maximum in the negative frequency component
+        of the shg band.
+    fm_neg : int
+        The index value of the maximum in the negative frequency component
+        of the fm band.
+    dc : int
+        The index value of the maximum in the DC base band.
+    fm_pos : int
+        The index value of the maximum in the positive frequency component
+        of the fm band.
+    shg_pos: int
+        The index value of the maximum in the positive frequency component 
+        of the shg band.
 
     """
     peaks = peak_local_max(fft_array, min_distance = 200, num_peaks=5)
@@ -319,30 +372,45 @@ def FindBandIndices(fft_array):
     band_indices = peaks[:,1]
     shg_neg = band_indices[0]
     fm_neg = band_indices[1]
-    fundamental = band_indices[2]
+    dc = band_indices[2]
     fm_pos = band_indices[3]
     shg_pos = band_indices[4]
     CheckIndices(band_indices, fft_array)
-    return fundamental, fm_neg, fm_pos, shg_neg, shg_pos
+    return dc, fm_pos, shg_pos
     
     
 #%% Check peak distances
-def CheckIndices(delays, fft_array):
-    if delays[2] == fft_array.shape[1] / 2:
+def CheckIndices(band_indices, fft_array):
+    """
+    Helper function. Verifies that the band indices are equally spaced.
+
+    Parameters
+    ----------
+    band_indices : int list
+        Array of indices.
+    fft_array : 2d array
+        Fourier transformed iFROG trace.
+
+    Returns
+    -------
+    None.
+
+    """
+    if band_indices[2] == fft_array.shape[1] / 2:
         print('Fundamental band ok')
     else:
         print('Fundamental peak location mismatch. Check peak finding params.')
-    if delays[2]-delays[1] == delays[3]-delays[2]:
+    if band_indices[2]-band_indices[1] == band_indices[3]-band_indices[2]:
         print('FM bands ok')
     else:
         print('FM band mismatch. Check peak finding params.')
-    if delays[2]-delays[0] == delays[4]-delays[2]:
+    if band_indices[2]-band_indices[0] == band_indices[4]-band_indices[2]:
         print('SHG bands ok')
     else:
         print('SHG band mismatch. Check fitting params.')
         
 #%% select bands
-def SelectBands(neg_band, pos_band, fft_array, bandwidth=200):
+def SelectBands(dc_band, fm_band, shg_band, fft_array, bandwidth=200):
     window = signal.windows.general_gaussian(fft_array[1].size, p=2,
                                              sig=bandwidth)
     window_neg = np.append(window[neg_band:window.size], np.zeros(neg_band))
