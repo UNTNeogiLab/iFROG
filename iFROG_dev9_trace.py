@@ -12,27 +12,30 @@ import numpy as np
 import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 import scipy.interpolate as interpolate
+from numba import jit
 from scipy import signal
 from matplotlib import ticker, cm
 from skimage.feature import peak_local_max
 
 #%% Data Import
 
-databbo = np.loadtxt("191231_BBO_865_20mW_10MHz_iRp_432GR_0000AE_10msE_8DIV_fine", delimiter="\t")
+databbo = np.loadtxt("/Users/tracebivens/Documents/GitHub/iFROG/200123_BBO_865nm_100mW_100mn_1slit_432grating_-11__27t0", delimiter="\t")
 databbo = np.delete(databbo, databbo.shape[1]-1, axis=1)
-datamos2 = np.loadtxt("191229_MOS2_865_20mW_10MHz_iRp_432GR_0966AE_1000msE_fine", delimiter="\t")
+datamos2 = np.loadtxt("/Users/tracebivens/Documents/GitHub/iFROG/200123_MoS2_865nm_100mW_100mn_1slit_432grating_-11__27t0", delimiter="\t")
 datamos2 = np.delete(datamos2, datamos2.shape[1]-1, axis=1)
 
-posb=np.loadtxt("191231_BBO_865_20mW_10MHz_iRp_432GR_0000AE_10msE_8DIV_fine_pos", delimiter="\t")
+posb=np.loadtxt("/Users/tracebivens/Documents/GitHub/iFROG/200123_BBO_865nm_100mW_100mn_1slit_432grating_-11__27t0_pos", delimiter="\t")
 #posb=np.delete(posb,5000,axis=0)
-posm=np.loadtxt("191229_MOS2_865_20mW_10MHz_iRp_432GR_0966AE_1000msE_fine_pos", delimiter="\t")
+posm=np.loadtxt("/Users/tracebivens/Documents/GitHub/iFROG/200123_MoS2_865nm_100mW_100mn_1slit_432grating_-11__27t0_pos", delimiter="\t")
 #posm=np.delete(posm,5000,axis=0)
 #%%
 
 
 #truncation (data specific)
-datamos2=datamos2[::,:6080]
-posm=np.resize(posm,[6080,])
+# =============================================================================
+# datamos2=datamos2[::,:6080]
+# posm=np.resize(posm,[6080,])
+# =============================================================================
 
 tzerob = -11704.60461
 tzerom = -11707.53711
@@ -51,13 +54,12 @@ xmg,ymg=np.meshgrid(xm,ym)
 
 #%%Normalization
 
-# =============================================================================
-# databbo = databbo/np.amax(databbo)
-# datamos2 = datamos2/np.amax(datamos2)
-# 
-# =============================================================================
-
-
+def CheckR_M(data):
+    summed = np.sum(data, axis=0)
+    summed = summed - summed.min()
+    r = summed[3900] / summed.max()
+    m = (np.abs(np.log2(r)) + 1) / 2
+    return r, m, summed
 #%%
 div=datamos2/(databbo)
 
@@ -164,15 +166,17 @@ xfft=Wm
 yfft=np.linspace(1,mfft.shape[0],num=mfft.shape[0])
 xgmfft, ygmfft =np.meshgrid(xfft,yfft)
 
-divfft=np.fft.fft(div)
-divfft = np.fft.fftshift(divfft, axes=1)
-W=np.fft.fftfreq(div[1].size,timestep)
-W = np.fft.fftshift(W)
-
-xfft=W
-yfft=np.linspace(1,divfft.shape[0],num=divfft.shape[0])
-xgdfft, ygdfft =np.meshgrid(xfft,yfft)
-
+# =============================================================================
+# divfft=np.fft.fft(div)
+# divfft = np.fft.fftshift(divfft, axes=1)
+# W=np.fft.fftfreq(div[1].size,timestep)
+# W = np.fft.fftshift(W)
+# 
+# xfft=W
+# yfft=np.linspace(1,divfft.shape[0],num=divfft.shape[0])
+# xgdfft, ygdfft =np.meshgrid(xfft,yfft)
+# 
+# =============================================================================
 
 #%% Plot FFT
 #g, (gx1,gx2) = plt.subplots(1,2, sharey=True)
@@ -301,7 +305,7 @@ CSB = filtaxB.contourf(xfilt,yfilt,np.abs(bfilt),500,cmap='jet')#,vmin=-10,vmax=
 def FindTZero(data_array):
     """
     Finds t0 in the raw iFROG trace.
-
+    NOT WORKING
     Parameters
     ----------
     data_array : ndarray
@@ -316,11 +320,39 @@ def FindTZero(data_array):
     t0 = peak_local_max(data_array, num_peaks=1)
     return t0
 #%% get FROG traces
-def FrogMath(fft_array, bandwidth=200):
-    band_indices = FindBandIndices(fft_array.real)
-    dc = fft_array[400:600,band_indices[0]-bandwidth:band_indices[0]+bandwidth]
-    fm = fft_array[400:600,band_indices[1]-bandwidth:band_indices[1]+bandwidth]
-    shg = fft_array[400:600,band_indices[2]-bandwidth:band_indices[2]+bandwidth]
+def FrogMath(fft_array, wav, bandwidth=128, norm=False):
+    """
+    Workflow: do bbo_wavelength = FrogMath(bfft, wav)
+    or mos2_wavelength = FrogMath(mfft, wav)
+    wav can be found at the bottom of the script
+
+    Parameters
+    ----------
+    fft_array : TYPE
+        DESCRIPTION.
+    wav : TYPE
+        DESCRIPTION.
+    bandwidth : TYPE, optional
+        DESCRIPTION. The default is 128.
+    norm : TYPE, optional
+        DESCRIPTION. The default is False.
+
+    Returns
+    -------
+    dict
+        DESCRIPTION.
+
+    """
+    peaks, band_indices, match = FindBandIndices(fft_array)
+    center = peaks[2,0], peaks[2,1]
+    center_peak = fft_array[center]
+    if norm == True:
+        fft_array = fft_array / center_peak
+    else:
+        pass
+    dc = fft_array[wav-bandwidth:wav+bandwidth,band_indices[0]-bandwidth:band_indices[0]+bandwidth]
+    fm = fft_array[wav-bandwidth:wav+bandwidth,band_indices[1]-bandwidth:band_indices[1]+bandwidth]
+    shg = fft_array[wav-bandwidth:wav+bandwidth,band_indices[2]-bandwidth:band_indices[2]+bandwidth]
     window = signal.windows.general_gaussian(dc[1].size, p=2, sig=bandwidth)
     dc = dc * window
     fm = fm * window
@@ -328,19 +360,63 @@ def FrogMath(fft_array, bandwidth=200):
     dc_ifft = np.fft.ifft(dc)
     fm_ifft = np.fft.ifft(fm)
     shg_ifft = np.fft.ifft(shg)
-    dc = np.abs(dc)
-    dc_ifft = np.abs(dc_ifft)
-    fm = np.abs(fm)
-    fm_ifft = np.abs(fm_ifft)
-    shg = np.abs(shg)
-    shg_ifft = np.abs(shg_ifft)
+    dc_mag = np.abs(dc)
+    dc_ifft_mag = np.abs(dc_ifft)
+    fm_mag = np.abs(fm)
+    fm_ifft_mag = np.abs(fm_ifft)
+    shg_mag = np.abs(shg)
+    shg_ifft_mag = np.abs(shg_ifft)
     
-    return dc, dc_ifft, fm, fm_ifft, shg, shg_ifft
+    return {'dc':dc,'dc_mag':dc_mag, 'dc_ifft':dc_ifft,
+            'dc_ifft_mag':dc_ifft_mag, 'fm':fm, 'fm_mag':fm_mag, 
+            'fm_ifft':fm_ifft, 'fm_ifft_mag':fm_ifft_mag, 'shg':shg,
+            'shg_mag':shg_mag, 'shg_ifft':shg_ifft,
+            'shg_ifft_mag':shg_ifft_mag, 'band_indices':band_indices,
+            'match':match}
 #%%
+def FrogLoop(fft_array, pump_wavelength, optical_bandwidth,
+             delay_bandwidth=250):
+    """
+    IGNORE, NOT WORKING YET
 
+    Parameters
+    ----------
+    fft_array : TYPE
+        DESCRIPTION.
+    pump_wavelength : TYPE
+        DESCRIPTION.
+    optical_bandwidth : TYPE
+        DESCRIPTION.
+    delay_bandwidth : TYPE, optional
+        DESCRIPTION. The default is 250.
+
+    Returns
+    -------
+    fft_mag : TYPE
+        DESCRIPTION.
+    ifft_mag : TYPE
+        DESCRIPTION.
+
+    """
+    shg_wavelength = pump_wavelength // 2
+    wavelength_high = shg_wavelength + (optical_bandwidth // 2)
+    wavelength_low = shg_wavelength - (optical_bandwidth // 2)
+    band_indices = FindBandIndices(fft_array.real)
+    clipped = [fft_array[wavelength_low : wavelength_high,
+                         i - delay_bandwidth : i + delay_bandwidth]
+               for i in band_indices]
+    window = signal.windows.general_gaussian(delay_bandwidth*2, p=2, 
+                                             sig=delay_bandwidth)
+    smoothed = [i * window for i in clipped]
+    del(window)
+    ifft = [np.fft.ifft(i) for i in smoothed]
+    ifft_mag = [np.abs(i) for i in ifft]
+    fft_mag = [np.abs(i) for i in smoothed]
+    
+    return fft_mag, ifft_mag
 #%% Find local maxima in FFT arrays
-def FindBandIndices(fft_array):
-    """F
+def FindBandIndices(fft_array, with_neg = False):
+    """
     Finds the 5 expected band maxima in a fourier-transformed iFROG trace
     and returns the corresponding indices. Requires real values.
 
@@ -348,6 +424,9 @@ def FindBandIndices(fft_array):
     ----------
     fft_array : 2d complex array
         iFROG data after FFT has been performed.
+    with_neg : bool
+        Set to True to retrieve all frequency bands, otherwise returns only
+        dc and positive frequencies.
 
     Returns
     -------
@@ -367,17 +446,19 @@ def FindBandIndices(fft_array):
         of the shg band.
 
     """
-    peaks = peak_local_max(fft_array, min_distance = 200, num_peaks=5)
-    peaks[:,1].sort()
+    peaks = peak_local_max(fft_array.real, min_distance = 100, num_peaks=5)
     band_indices = peaks[:,1]
+    band_indices.sort()
     shg_neg = band_indices[0]
     fm_neg = band_indices[1]
     dc = band_indices[2]
     fm_pos = band_indices[3]
     shg_pos = band_indices[4]
-    CheckIndices(band_indices, fft_array)
-    return dc, fm_pos, shg_pos
-    
+    match = CheckIndices(band_indices, fft_array)
+    if with_neg == False:
+        return peaks, [dc, fm_pos, shg_pos], match
+    else:
+        return peaks, band_indices, match
     
 #%% Check peak distances
 def CheckIndices(band_indices, fft_array):
@@ -397,20 +478,54 @@ def CheckIndices(band_indices, fft_array):
 
     """
     if band_indices[2] == fft_array.shape[1] / 2:
-        print('Fundamental band ok')
+        print('DC band ok')
+        dc = True
     else:
-        print('Fundamental peak location mismatch. Check peak finding params.')
+        print('DC peak location mismatch. Check peak finding params.')
+        dc = False
     if band_indices[2]-band_indices[1] == band_indices[3]-band_indices[2]:
         print('FM bands ok')
+        fm = True
     else:
         print('FM band mismatch. Check peak finding params.')
+        fm = False
     if band_indices[2]-band_indices[0] == band_indices[4]-band_indices[2]:
         print('SHG bands ok')
+        shg = True
     else:
         print('SHG band mismatch. Check fitting params.')
+        shg = False
+    match = [dc, fm, shg]
+    return match
         
 #%% select bands
 def SelectBands(dc_band, fm_band, shg_band, fft_array, bandwidth=200):
+    """
+    Ignore until further notice
+
+    Parameters
+    ----------
+    dc_band : TYPE
+        DESCRIPTION.
+    fm_band : TYPE
+        DESCRIPTION.
+    shg_band : TYPE
+        DESCRIPTION.
+    fft_array : TYPE
+        DESCRIPTION.
+    bandwidth : TYPE, optional
+        DESCRIPTION. The default is 200.
+
+    Returns
+    -------
+    window : TYPE
+        DESCRIPTION.
+    window_neg : TYPE
+        DESCRIPTION.
+    window_pos : TYPE
+        DESCRIPTION.
+
+    """
     window = signal.windows.general_gaussian(fft_array[1].size, p=2,
                                              sig=bandwidth)
     window_neg = np.append(window[neg_band:window.size], np.zeros(neg_band))
@@ -419,14 +534,40 @@ def SelectBands(dc_band, fm_band, shg_band, fft_array, bandwidth=200):
     return window, window_neg, window_pos
     
 #%%thing
-    fm_neg = bfft.real[:,fm_neg-300:fm_neg+300]
-#%% interpolate
-
-xgrid, ygrid = np.meshgrid(256,1024)
-
-grid_z0 = griddata((xfilt,yfilt), divfilt.real, (xgrid, ygrid), method='nearest')
-
-plt.contourf(xgrid, ygrid, grid_z0)
+def Norm(array):
+    norm = array - array.min()
+    div = array.max() - array.min()
+    norm = norm / div
+    return norm
+#%%
+def MagPlot(dictionary, vmin=0, vmax=50000):
+    plotlist = ['dc_mag', 'dc_ifft_mag', 'fm_mag', 'fm_ifft_mag',
+                'shg_mag', 'shg_ifft_mag']
+    for i in plotlist:
+        plt.matshow(dictionary[i], vmin=vmin, vmax=vmax)
+#%%
+def StretchPlot(dictionary):
+    plotlist = ['dc_mag', 'dc_ifft_mag', 'fm_mag', 'fm_ifft_mag',
+                'shg_mag', 'shg_ifft_mag']
+    for i in plotlist:
+        plt.matshow(dictionary[i])
+#%%
+def FrogSave(dictionary, name):
+    if all(dictionary['match']) == True:
+        fm_ifft_mag = dictionary['fm_ifft_mag']
+        np.savetxt(name, fm_ifft_mag, delimiter='\t')
+    else:
+        fm_ifft_mag = dictionary['shg_ifft_mag']
+        np.savetxt(name, fm_ifft_mag, delimiter='\t')
+# =============================================================================
+# #%% interpolate
+# 
+# xgrid, ygrid = np.meshgrid(256,1024)
+# 
+# grid_z0 = griddata((xfilt,yfilt), divfilt.real, (xgrid, ygrid), method='nearest')
+# 
+# plt.contourf(xgrid, ygrid, grid_z0)
+# =============================================================================
 
 """
 fundamental window sigma: 200
@@ -436,6 +577,8 @@ fm slice width: 600
 shg window sigma: 100
 shg slice width: 200
 
-
-
+840 center: 670
+850 center: 600
+865 center: 485
+870 center: 450
 """
